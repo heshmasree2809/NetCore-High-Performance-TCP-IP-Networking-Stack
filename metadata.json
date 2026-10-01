@@ -1,0 +1,6 @@
+{
+  "name": "NetCore — High-Performance TCP/IP Networking Stack",
+  "description": "Production-grade Linux C++17 event-driven networking framework featuring epoll, thread pool, TCP/UDP sockets, connection state machine, stress testing, and real-time telemetry.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

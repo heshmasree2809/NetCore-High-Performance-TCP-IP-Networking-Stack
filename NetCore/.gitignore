@@ -1,0 +1,31 @@
+# Build artifacts
+build/
+bin/
+lib/
+*.o
+*.a
+*.so
+
+# CMake artifacts
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+Testing/
+
+# Core dumps and logs
+core
+core.*
+vgcore.*
+*.log
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# Test outputs
+*.gcda
+*.gcno
+*.gcov

@@ -1,0 +1,146 @@
+name: NetCore CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  lint:
+    name: Code Formatting & Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Linting Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format cppcheck
+
+      - name: Run Clang-Format Verification
+        run: |
+          find include src tests benchmarks -name "*.hpp" -o -name "*.cpp" | xargs clang-format --dry-run -Werror
+
+      - name: Run Cppcheck Static Analysis
+        run: |
+          cppcheck --enable=warning,performance,portability --inline-suppr --error-exitcode=1 -I include src/
+
+  build-and-test:
+    name: Build & Test (${{ matrix.build_type }}, ${{ matrix.compiler }})
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [Debug, Release]
+        compiler: [gcc, clang]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Compiler
+        run: |
+          if [ "${{ matrix.compiler }}" = "clang" ]; then
+            sudo apt-get update && sudo apt-get install -y clang
+            echo "CC=clang" >> $GITHUB_ENV
+            echo "CXX=clang++" >> $GITHUB_ENV
+          else
+            echo "CC=gcc" >> $GITHUB_ENV
+            echo "CXX=g++" >> $GITHUB_ENV
+          fi
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+
+      - name: Compile NetCore Stack
+        run: |
+          cmake --build build -j$(nproc)
+
+      - name: Run Test Suite (CTest)
+        run: |
+          cd build && ctest --output-on-failure
+
+  sanitizers:
+    name: Sanitizers (${{ matrix.sanitizer }})
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [ASAN, TSAN]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure with ${{ matrix.sanitizer }}
+        run: |
+          if [ "${{ matrix.sanitizer }}" = "ASAN" ]; then
+            cmake -B build -DENABLE_ASAN=ON -DCMAKE_BUILD_TYPE=Debug
+          else
+            cmake -B build -DENABLE_TSAN=ON -DCMAKE_BUILD_TYPE=Debug
+          fi
+
+      - name: Build Sanitized Binaries
+        run: |
+          cmake --build build --target netcore_tests -j$(nproc)
+
+      - name: Run Sanitized Tests
+        run: |
+          ./build/tests/netcore_tests
+
+  benchmarks:
+    name: Automated Benchmark Regression Check
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Build Optimized Release
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j$(nproc)
+
+      - name: Execute Benchmark Suite
+        run: |
+          ./benchmarks/run_full_benchmarks.sh
+
+      - name: Archive Benchmark Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            benchmarks/benchmark_results.csv
+            benchmarks/results.md
+
+  package:
+    name: Generate Binary Packages (.deb / .tar.gz)
+    needs: [build-and-test, sanitizers]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure & Build Release
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j$(nproc)
+
+      - name: Package with CPack
+        run: |
+          cd build
+          cpack -G TGZ
+          cpack -G DEB
+
+      - name: Archive Distribution Packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: netcore-dist-packages
+          path: |
+            build/*.tar.gz
+            build/*.deb
