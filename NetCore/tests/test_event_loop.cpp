@@ -5,7 +5,6 @@
 #include <thread>
 #include <chrono>
 #include <atomic>
-
 using namespace netcore;
 
 NETCORE_TEST(EventLoopTest, WakeupAndStop) {
