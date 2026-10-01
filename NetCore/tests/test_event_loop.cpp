@@ -10,7 +10,8 @@ using namespace netcore;
 NETCORE_TEST(EventLoopTest, WakeupAndStop) {
     EventLoop loop(16);
     std::atomic<bool> threadStarted{false};
-    std::thread th([&]() {
+    std::thread th([&]() 
+    {
         threadStarted = true;
         loop.run();
     });
