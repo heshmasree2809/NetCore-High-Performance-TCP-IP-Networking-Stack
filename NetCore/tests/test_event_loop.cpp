@@ -21,10 +21,8 @@ NETCORE_TEST(EventLoopTest, WakeupAndStop) {
         std::this_thread::yield();
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-
     loop.wakeup();
     loop.stop();
-
     if (th.joinable()) {
         th.join();
     }
